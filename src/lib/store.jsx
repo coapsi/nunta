@@ -4,7 +4,7 @@ import { rpc } from './api.js';
 const Ctx = createContext(null);
 export const useStore = () => useContext(Ctx);
 
-const EMPTY = { settings: {}, members: [], invitations: [], guests: [], tables: [], expenses: [] };
+const EMPTY = { settings: {}, members: [], invitations: [], guests: [], tables: [], expenses: [], vendors: [], payments: [], tasks: [], schedule: [], items: [], rooms: [] };
 
 function applyOps(state, ops) {
   const next = { ...state };
@@ -20,6 +20,9 @@ function applyOps(state, ops) {
       if (o.table === 'invitations') next.guests = next.guests.filter((g) => g.invitation_id !== o.id);
       if (o.table === 'tables')
         next.guests = next.guests.map((g) => (g.table_id === o.id ? { ...g, table_id: null, seat: null } : g));
+      if (o.table === 'rooms') next.guests = next.guests.map((g) => (g.room_id === o.id ? { ...g, room_id: null } : g));
+      if (o.table === 'expenses') next.payments = next.payments.filter((p) => p.expense_id !== o.id);
+      if (o.table === 'vendors') next.expenses = next.expenses.map((e) => (e.vendor_id === o.id ? { ...e, vendor_id: null } : e));
     }
   }
   return next;

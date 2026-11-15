@@ -11,12 +11,18 @@ import Guests from './pages/Guests.jsx';
 import Seating from './pages/Seating.jsx';
 import Budget from './pages/Budget.jsx';
 import Settings from './pages/Settings.jsx';
+import Vendors from './pages/Vendors.jsx';
+import Rooms from './pages/Rooms.jsx';
+import Plan from './pages/Plan.jsx';
 
 const NAV = [
   { to: '/', label: 'Acasă', end: true },
   { to: '/invitati', label: 'Invitați' },
   { to: '/mese', label: 'Mese' },
+  { to: '/cazare', label: 'Cazare' },
   { to: '/buget', label: 'Buget' },
+  { to: '/furnizori', label: 'Furnizori' },
+  { to: '/planificare', label: 'Planificare' },
   { to: '/setari', label: 'Setări' },
 ];
 
@@ -65,6 +71,9 @@ function Shell({ member, onLogout }) {
             <Route path="/invitati" element={<Guests />} />
             <Route path="/mese" element={<Seating />} />
             <Route path="/buget" element={<Budget />} />
+            <Route path="/cazare" element={<Rooms />} />
+            <Route path="/furnizori" element={<Vendors />} />
+            <Route path="/planificare" element={<Plan />} />
             <Route path="/setari" element={<Settings member={member} />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>

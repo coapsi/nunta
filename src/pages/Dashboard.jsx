@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { useStore } from '../lib/store.jsx';
-import { budget, calcOf, eventOf, headcount, money, scenario } from '../lib/calc.js';
+import { budget, calcOf, eventOf, fmtDate, headcount, money, scenario, taskDue, todayIso, withPayments } from '../lib/calc.js';
 import { Card, PageHeader, Stat } from '../components/ui.jsx';
 
 function Bar({ parts }) {
@@ -16,7 +16,8 @@ function Bar({ parts }) {
 }
 
 export default function Dashboard() {
-  const { invitations, guests, tables, expenses, settings } = useStore();
+  const { invitations, guests, tables, expenses: raw, payments, tasks, vendors, settings } = useStore();
+  const expenses = useMemo(() => withPayments(raw, payments), [raw, payments]);
   const ev = eventOf(settings);
   const calc = calcOf(settings);
   const counts = useMemo(() => headcount(invitations, guests), [invitations, guests]);
@@ -28,6 +29,19 @@ export default function Dashboard() {
   const days = ev.date ? Math.ceil((new Date(ev.date + 'T00:00:00') - new Date(new Date().toDateString())) / 86400000) : null;
   const unsent = invitations.filter((i) => !i.sent_at).length;
 
+  const today = todayIso();
+  const expById = Object.fromEntries(expenses.map((e) => [e.id, e]));
+  const vendorById = Object.fromEntries(vendors.map((v) => [v.id, v]));
+  const nextPayments = payments
+    .filter((p) => !p.paid && Number(p.amount) > 0)
+    .sort((a, b) => (a.due_date || '9999').localeCompare(b.due_date || '9999'))
+    .slice(0, 5);
+  const openTasks = tasks
+    .filter((t) => !t.done)
+    .map((t) => ({ ...t, due: taskDue(t, ev.date) }))
+    .sort((a, b) => (a.due || '9999').localeCompare(b.due || '9999') || b.months_before - a.months_before);
+  const doneTasks = tasks.length - openTasks.length;
+
   const todo = [
     !ev.date && { text: 'Completează data, locația și textul invitației', to: '/setari' },
     !invitations.length && { text: 'Adaugă lista de invitați', to: '/invitati' },
@@ -36,7 +50,8 @@ export default function Dashboard() {
     !tables.length && invitations.length > 0 && { text: 'Creează mesele și așază invitații', to: '/mese' },
     tables.length > 0 && seats < toSeat && { text: `Ai ${toSeat} persoane și doar ${seats} locuri la mese`, to: '/mese' },
     tables.length > 0 && counts.seated < toSeat && { text: `${toSeat - counts.seated} persoane nu au încă loc la masă`, to: '/mese' },
-    b.remaining > 0 && { text: `Mai ai de plătit ${money(b.remaining, ev.currency)}`, to: '/buget' },
+    !tasks.length && { text: 'Pornește checklistul cu lista recomandată', to: '/planificare' },
+    !vendors.length && expenses.length > 0 && { text: 'Adaugă furnizorii și tranșele de plată', to: '/furnizori' },
   ].filter(Boolean);
 
   return (
@@ -95,7 +110,57 @@ export default function Dashboard() {
         </Card>
 
         <Card>
-          <h3 className="mb-3 text-sm font-semibold text-stone-800">De făcut</h3>
+          <div className="mb-3 flex items-center justify-between">
+            <h3 className="text-sm font-semibold text-stone-800">Checklist</h3>
+            <Link to="/planificare" className="text-xs font-medium text-olive-700 hover:underline">
+              {tasks.length ? `${doneTasks} din ${tasks.length} făcute` : 'Deschide'}
+            </Link>
+          </div>
+          {tasks.length > 0 && <Bar parts={[{ label: 'Făcute', value: doneTasks, color: '#6f874d' }, { label: 'Rămase', value: openTasks.length, color: '#e7e5e4' }]} />}
+          <ul className="mt-3 space-y-1.5 text-sm">
+            {openTasks.slice(0, 6).map((t) => (
+              <li key={t.id} className="flex justify-between gap-3">
+                <span className="min-w-0 truncate text-stone-700">{t.title}</span>
+                <span className={`shrink-0 text-xs ${t.due && t.due < today ? 'font-medium text-red-600' : 'text-stone-500'}`}>{t.due ? fmtDate(t.due) : ''}</span>
+              </li>
+            ))}
+            {!openTasks.length && <li className="text-stone-500">{tasks.length ? 'Totul e bifat.' : 'Checklistul e gol.'}</li>}
+          </ul>
+        </Card>
+
+        <Card>
+          <div className="mb-3 flex items-center justify-between">
+            <h3 className="text-sm font-semibold text-stone-800">Plăți care urmează</h3>
+            <Link to="/furnizori" className="text-xs font-medium text-olive-700 hover:underline">
+              Furnizori
+            </Link>
+          </div>
+          <ul className="space-y-1.5 text-sm">
+            {nextPayments.map((p) => {
+              const e = expById[p.expense_id];
+              return (
+                <li key={p.id} className="flex justify-between gap-3">
+                  <span className="min-w-0 truncate text-stone-700">
+                    {p.label}
+                    <span className="text-stone-400"> · {vendorById[e?.vendor_id]?.name || e?.name}</span>
+                  </span>
+                  <span className="shrink-0 text-right">
+                    <span className="font-medium tabular-nums">{money(p.amount, ev.currency)}</span>
+                    {p.due_date && <span className={`ml-2 text-xs ${p.due_date < today ? 'font-medium text-red-600' : 'text-stone-500'}`}>{fmtDate(p.due_date)}</span>}
+                  </span>
+                </li>
+              );
+            })}
+            {!nextPayments.length && <li className="text-stone-500">Nicio tranșă neplătită. Tranșele se adaugă la fiecare cheltuială.</li>}
+          </ul>
+          <div className="mt-3 flex justify-between border-t border-stone-100 pt-2 text-sm">
+            <span className="text-stone-600">Plătit / total</span>
+            <span className="font-medium tabular-nums">{money(b.paid, ev.currency)} / {money(b.total, ev.currency)}</span>
+          </div>
+        </Card>
+
+        <Card>
+          <h3 className="mb-3 text-sm font-semibold text-stone-800">De făcut acum</h3>
           {todo.length ? (
             <ul className="space-y-2">
               {todo.map((t) => (

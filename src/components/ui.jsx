@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 
 const cx = (...a) => a.filter(Boolean).join(' ');
 
@@ -141,5 +141,32 @@ export function Empty({ title, children }) {
     </div>
   );
 }
+
+// Camp care tine textul local cat timp scrii si salveaza cand iesi din el.
+export function Cell({ value, onCommit, type = 'text', className, ...props }) {
+  const [text, setText] = useState(value ?? '');
+  useEffect(() => setText(value ?? ''), [value]);
+  const commit = () => {
+    const v = type === 'number' ? (text === '' ? 0 : Number(String(text).replace(',', '.')) || 0) : text;
+    if (v !== (value ?? '')) onCommit(v);
+  };
+  return (
+    <input
+      type={type === 'number' ? 'text' : type}
+      inputMode={type === 'number' ? 'decimal' : undefined}
+      value={text}
+      onChange={(e) => setText(e.target.value)}
+      onBlur={commit}
+      onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
+      className={cx(
+        'w-full rounded-md border border-transparent bg-transparent px-2 py-1.5 text-sm hover:border-stone-200 focus:border-olive-500 focus:bg-white focus:outline-none',
+        type === 'number' && 'text-right tabular-nums',
+        className,
+      )}
+      {...props}
+    />
+  );
+}
+
 
 export { cx };

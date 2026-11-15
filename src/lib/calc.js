@@ -106,7 +106,7 @@ export function scenario(calc, counts, tableCount) {
     payingInvitations = Math.round(counts.invYes + counts.invPending * rate);
   }
   const persons = adults + children;
-  const tables = tableCount > 0 ? tableCount : Math.ceil(persons / 10);
+  const tables = Math.max(tableCount, Math.ceil(persons / 10));
   return { adults, children, persons, tables, payingInvitations };
 }
 
@@ -160,4 +160,60 @@ export function budget(expenses, s, calc) {
     // adulti necesari ca sa iesi pe zero la darul mediu ales (costurile variabile cresc cu fiecare adult)
     breakEvenAdults: gift - perAdult > 0 ? Math.ceil((fixed + perChild * s.children) / (gift - perAdult)) : null,
   };
+}
+
+// Daca o cheltuiala are transe de plata, "platit" vine din transele bifate.
+export function withPayments(expenses, payments) {
+  const by = new Map();
+  for (const p of payments) {
+    if (!by.has(p.expense_id)) by.set(p.expense_id, []);
+    by.get(p.expense_id).push(p);
+  }
+  return expenses.map((e) => {
+    const list = by.get(e.id);
+    if (!list?.length) return e;
+    return { ...e, paid: list.filter((p) => p.paid).reduce((s, p) => s + (Number(p.amount) || 0), 0), hasPayments: true };
+  });
+}
+
+export const EXPENSE_STATUS = { estimat: 'Estimat', oferta: 'Ofertă primită', contractat: 'Contractat', platit: 'Plătit integral' };
+
+export const VENDOR_STATUS = { cautam: 'Căutăm', oferta: 'Ofertă primită', rezervat: 'Rezervat', contract: 'Contract semnat', gata: 'Încheiat' };
+
+// Fazele checklistului, dupa cate luni mai sunt pana la nunta.
+export const PHASES = [
+  { key: 12, label: 'Cu 10-12 luni înainte' },
+  { key: 9, label: 'Cu 7-9 luni înainte' },
+  { key: 6, label: 'Cu 4-6 luni înainte' },
+  { key: 3, label: 'Cu 2-3 luni înainte' },
+  { key: 1, label: 'Ultima lună' },
+  { key: 0.25, label: 'Ultima săptămână' },
+  { key: 0, label: 'Ziua dinainte și ziua nunții' },
+  { key: -1, label: 'După nuntă' },
+];
+
+// Termenul unei sarcini: data pusa de mana sau calculata din data nuntii.
+export function taskDue(task, weddingDate) {
+  if (task.due_date) return task.due_date;
+  if (!weddingDate) return null;
+  const d = new Date(weddingDate + 'T00:00:00');
+  const m = Number(task.months_before) || 0;
+  if (m === 0.25) d.setDate(d.getDate() - 7);
+  else if (m === 0) d.setDate(d.getDate() - 1);
+  else if (m < 0) d.setDate(d.getDate() + 30);
+  else d.setMonth(d.getMonth() - ({ 12: 10, 9: 7, 6: 4, 3: 2 }[m] || m)); // capatul de jos al intervalului
+  const p2 = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())}`;
+}
+
+export function todayIso() {
+  const d = new Date();
+  const p2 = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())}`;
+}
+
+export function fmtDate(iso) {
+  if (!iso) return '';
+  const d = new Date(iso + 'T00:00:00');
+  return isNaN(d) ? iso : d.toLocaleDateString('ro-RO', { day: 'numeric', month: 'short', year: 'numeric' });
 }

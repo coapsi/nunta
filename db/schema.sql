@@ -155,3 +155,79 @@ begin
 
   return jsonb_build_object('ok', true);
 end $$;
+
+-- ---------- v2: furnizori, plati, checklist, programul zilei, liste, cazare ----------
+create table if not exists vendors (
+  id uuid primary key default gen_random_uuid(),
+  category text not null default 'Altele',
+  name text not null default '',
+  status text not null default 'cautam',
+  contact text not null default '',
+  phone text not null default '',
+  email text not null default '',
+  link text not null default '',
+  contract_url text not null default '',
+  notes text not null default '',
+  sort int not null default 0,
+  created_at timestamptz not null default now()
+);
+alter table expenses add column if not exists vendor_id uuid references vendors(id) on delete set null;
+alter table expenses add column if not exists status text not null default 'estimat';
+
+create table if not exists payments (
+  id uuid primary key default gen_random_uuid(),
+  expense_id uuid not null references expenses(id) on delete cascade,
+  label text not null default '',
+  amount numeric not null default 0,
+  due_date text,
+  paid boolean not null default false,
+  sort int not null default 0,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists tasks (
+  id uuid primary key default gen_random_uuid(),
+  title text not null default '',
+  months_before numeric not null default 6,
+  due_date text,
+  assignee text not null default '',
+  done boolean not null default false,
+  notes text not null default '',
+  sort int not null default 0,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists schedule (
+  id uuid primary key default gen_random_uuid(),
+  time text not null default '',
+  title text not null default '',
+  who text not null default '',
+  notes text not null default '',
+  sort int not null default 0,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists items (
+  id uuid primary key default gen_random_uuid(),
+  list text not null,
+  grp text not null default '',
+  title text not null default '',
+  note text not null default '',
+  link text not null default '',
+  price numeric,
+  done boolean not null default false,
+  sort int not null default 0,
+  created_at timestamptz not null default now()
+);
+create index if not exists items_list_idx on items(list);
+
+create table if not exists rooms (
+  id uuid primary key default gen_random_uuid(),
+  name text not null default '',
+  capacity int not null default 2,
+  price numeric not null default 0,
+  notes text not null default '',
+  sort int not null default 0,
+  created_at timestamptz not null default now()
+);
+alter table guests add column if not exists room_id uuid references rooms(id) on delete set null;

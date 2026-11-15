@@ -1,8 +1,9 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useStore } from '../lib/store.jsx';
 import { uid } from '../lib/api.js';
-import { EXPENSE_KINDS, budget, calcOf, eventOf, expenseTotal, headcount, money, scenario } from '../lib/calc.js';
-import { Button, Card, Empty, Field, PageHeader, Select, Stat, cx } from '../components/ui.jsx';
+import { EXPENSE_KINDS, EXPENSE_STATUS, budget, calcOf, eventOf, expenseTotal, headcount, money, scenario, withPayments } from '../lib/calc.js';
+import Payments from '../components/Payments.jsx';
+import { Button, Card, Cell, Empty, Field, PageHeader, Select, Stat, cx } from '../components/ui.jsx';
 
 const CATEGORIES = ['Locație și meniu', 'Băuturi', 'Muzică', 'Foto și video', 'Decor și flori', 'Ținute', 'Papetărie', 'Cazare', 'Ceremonie', 'Altele'];
 
@@ -28,32 +29,6 @@ const TEMPLATE = [
   ['Ceremonie', 'Cununie civilă', 'fixed'],
 ];
 
-// Camp care tine textul local cat timp scrii si salveaza cand iesi din el.
-function Cell({ value, onCommit, type = 'text', className, ...props }) {
-  const [text, setText] = useState(value ?? '');
-  useEffect(() => setText(value ?? ''), [value]);
-  const commit = () => {
-    const v = type === 'number' ? (text === '' ? 0 : Number(String(text).replace(',', '.')) || 0) : text;
-    if (v !== (value ?? '')) onCommit(v);
-  };
-  return (
-    <input
-      type={type === 'number' ? 'text' : type}
-      inputMode={type === 'number' ? 'decimal' : undefined}
-      value={text}
-      onChange={(e) => setText(e.target.value)}
-      onBlur={commit}
-      onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
-      className={cx(
-        'w-full rounded-md border border-transparent bg-transparent px-2 py-1.5 text-sm hover:border-stone-200 focus:border-olive-500 focus:bg-white focus:outline-none',
-        type === 'number' && 'text-right tabular-nums',
-        className,
-      )}
-      {...props}
-    />
-  );
-}
-
 function NumberField({ label, value, onChange, suffix, hint }) {
   return (
     <Field label={label} hint={hint}>
@@ -66,7 +41,9 @@ function NumberField({ label, value, onChange, suffix, hint }) {
 }
 
 export default function Budget() {
-  const { expenses, invitations, guests, tables, settings, mutate, saveSettings } = useStore();
+  const { expenses: rawExpenses, payments, vendors, invitations, guests, tables, settings, mutate, saveSettings } = useStore();
+  const expenses = useMemo(() => withPayments(rawExpenses, payments), [rawExpenses, payments]);
+  const [open, setOpen] = useState(null);
   const ev = eventOf(settings);
   const calc = calcOf(settings);
   const cur = ev.currency || 'EUR';
@@ -156,7 +133,7 @@ export default function Budget() {
             </div>
             <div className="rounded-xl bg-stone-100 p-3 text-center">
               <div className="text-2xl font-semibold tabular-nums text-stone-800">{s.tables}</div>
-              <div className="text-xs text-stone-600">{tableCount ? 'mese' : 'mese (estimat, 10/masă)'}</div>
+              <div className="text-xs text-stone-600">{tableCount >= s.tables ? 'mese' : 'mese (estimat, 10/masă)'}</div>
             </div>
             <div className="col-span-3 text-xs text-stone-500">
               Acum: {counts.confirmedAdults} adulți și {counts.confirmedChildren} copii confirmați, {counts.pendingAdults + counts.pendingChildren} persoane fără răspuns, {counts.pendingPlusOnes} însoțitori posibili.
@@ -281,7 +258,7 @@ export default function Budget() {
                   <th className="px-2 py-2 text-right font-medium">Total în scenariu</th>
                   <th className="px-2 py-2 text-right font-medium">Plătit</th>
                   <th className="px-2 py-2 text-right font-medium">Rest</th>
-                  <th className="px-2 py-2 text-left font-medium">Furnizor / notițe</th>
+                  <th className="px-2 py-2 text-left font-medium">Notițe</th>
                   <th className="w-8" />
                 </tr>
               </thead>
@@ -305,9 +282,16 @@ export default function Budget() {
                         const t = expenseTotal(e, s);
                         const rest = t - (Number(e.paid) || 0);
                         return (
-                          <tr key={e.id} className="border-t border-stone-100">
+                          <React.Fragment key={e.id}>
+                          <tr className="border-t border-stone-100">
                             <td className="px-1 py-0.5">
-                              <Cell value={e.name} placeholder="Denumire" onCommit={(v) => save(e.id, { name: v })} />
+                              <div className="flex items-center">
+                                <button className={cx('w-5 shrink-0 text-xs', open === e.id ? 'text-olive-700' : 'text-stone-400 hover:text-stone-700')} onClick={() => setOpen(open === e.id ? null : e.id)} title="Furnizor, stare și plăți">
+                                  {open === e.id ? '▾' : '▸'}
+                                </button>
+                                <Cell value={e.name} placeholder="Denumire" onCommit={(v) => save(e.id, { name: v })} />
+                                {e.status && e.status !== 'estimat' && <span className="ml-1 shrink-0 rounded-full bg-olive-100 px-1.5 py-0.5 text-[10px] font-medium text-olive-800">{EXPENSE_STATUS[e.status]}</span>}
+                              </div>
                             </td>
                             <td className="px-1 py-0.5">
                               <div className="flex gap-1">
@@ -344,7 +328,11 @@ export default function Budget() {
                               )}
                             </td>
                             <td className="w-28 px-1 py-0.5">
-                              <Cell type="number" value={e.paid} onCommit={(v) => save(e.id, { paid: v })} />
+                              {e.hasPayments ? (
+                                <div className="px-2 py-1.5 text-right tabular-nums text-stone-700" title="Calculat din tranșele bifate">{new Intl.NumberFormat('ro-RO').format(e.paid)}</div>
+                              ) : (
+                                <Cell type="number" value={e.paid} onCommit={(v) => save(e.id, { paid: v })} />
+                              )}
                             </td>
                             <td className={cx('px-2 py-0.5 text-right tabular-nums', rest > 0 ? 'text-clay-600' : 'text-olive-700')}>{money(rest, cur)}</td>
                             <td className="px-1 py-0.5">
@@ -360,6 +348,37 @@ export default function Budget() {
                               </button>
                             </td>
                           </tr>
+                          {open === e.id && (
+                            <tr className="bg-stone-50/70">
+                              <td colSpan={8} className="px-4 py-3">
+                                <div className="grid gap-4 md:grid-cols-[220px_1fr]">
+                                  <div className="space-y-2">
+                                    <Field label="Stare">
+                                      <Select value={e.status || 'estimat'} onChange={(ev2) => save(e.id, { status: ev2.target.value })}>
+                                        {Object.entries(EXPENSE_STATUS).map(([k, v]) => (
+                                          <option key={k} value={k}>
+                                            {v}
+                                          </option>
+                                        ))}
+                                      </Select>
+                                    </Field>
+                                    <Field label="Furnizor">
+                                      <Select value={e.vendor_id || ''} onChange={(ev2) => save(e.id, { vendor_id: ev2.target.value || null })}>
+                                        <option value="">Fără furnizor</option>
+                                        {vendors.map((v) => (
+                                          <option key={v.id} value={v.id}>
+                                            {v.name || v.category}
+                                          </option>
+                                        ))}
+                                      </Select>
+                                    </Field>
+                                  </div>
+                                  <Payments expense={e} currency={cur} total={t} />
+                                </div>
+                              </td>
+                            </tr>
+                          )}
+                          </React.Fragment>
                         );
                       })}
                     </React.Fragment>

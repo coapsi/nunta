@@ -11,11 +11,18 @@ import {
 // Coloanele care pot fi scrise din aplicatie, pe fiecare tabel.
 const TABLES = {
   invitations: ['name', 'side', 'grp', 'phone', 'allow_plus_one', 'max_children', 'status', 'message', 'notes', 'gift_amount', 'sent_at', 'responded_at'],
-  guests: ['invitation_id', 'name', 'kind', 'is_child', 'menu', 'attending', 'table_id', 'seat', 'sort'],
+  guests: ['invitation_id', 'name', 'kind', 'is_child', 'menu', 'attending', 'table_id', 'seat', 'sort', 'room_id'],
   tables: ['name', 'shape', 'seats', 'x', 'y', 'rotation', 'config', 'sort'],
-  expenses: ['category', 'name', 'kind', 'amount', 'paid', 'vendor', 'due_date', 'notes', 'sort'],
+  expenses: ['category', 'name', 'kind', 'amount', 'paid', 'vendor', 'due_date', 'notes', 'sort', 'vendor_id', 'status'],
+  vendors: ['category', 'name', 'status', 'contact', 'phone', 'email', 'link', 'contract_url', 'notes', 'sort'],
+  payments: ['expense_id', 'label', 'amount', 'due_date', 'paid', 'sort'],
+  tasks: ['title', 'months_before', 'due_date', 'assignee', 'done', 'notes', 'sort'],
+  schedule: ['time', 'title', 'who', 'notes', 'sort'],
+  items: ['list', 'grp', 'title', 'note', 'link', 'price', 'done', 'sort'],
+  rooms: ['name', 'capacity', 'price', 'notes', 'sort'],
 };
-const NUMERIC = ['x', 'y', 'rotation', 'gift_amount', 'amount', 'paid'];
+const NUMERIC = ['x', 'y', 'rotation', 'gift_amount', 'amount', 'price', 'months_before'];
+const NUMERIC_BY_TABLE = { expenses: ['paid'] };
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 class ApiError extends Error {
@@ -26,10 +33,10 @@ class ApiError extends Error {
   }
 }
 
-function clean(row) {
+function clean(row, table) {
   if (!row) return row;
   const out = { ...row };
-  for (const k of NUMERIC) if (out[k] != null) out[k] = Number(out[k]);
+  for (const k of [...NUMERIC, ...(NUMERIC_BY_TABLE[table] || [])]) if (out[k] != null) out[k] = Number(out[k]);
   return out;
 }
 
@@ -43,7 +50,7 @@ async function saveRow(table, row) {
   if (keys.length) {
     const sets = keys.map((k, i) => `${k} = $${i + 2}`).join(', ');
     const updated = await q(`update ${table} set ${sets} where id = $1 returning *`, [row.id, ...values]);
-    if (updated.length) return clean(updated[0]);
+    if (updated.length) return clean(updated[0], table);
   }
   const names = ['id', ...keys];
   const marks = names.map((_, i) => `$${i + 1}`);
@@ -52,7 +59,7 @@ async function saveRow(table, row) {
      on conflict (id) do nothing returning *`,
     [row.id, ...values],
   );
-  return clean(rows[0] || { id: row.id });
+  return clean(rows[0] || { id: row.id }, table);
 }
 
 async function deleteRow(table, id) {
@@ -73,23 +80,17 @@ function publicMember(m) {
   };
 }
 
+const STATE_TABLES = ['invitations', 'guests', 'tables', 'expenses', 'vendors', 'payments', 'tasks', 'schedule', 'items', 'rooms'];
+
 async function loadState() {
-  const [settings, members, invitations, guests, tables, expenses] = await Promise.all([
+  const [settings, members, ...lists] = await Promise.all([
     q('select data from settings where id = 1'),
     q('select * from members order by created_at'),
-    q('select * from invitations order by created_at'),
-    q('select * from guests order by sort, created_at'),
-    q('select * from tables order by sort, created_at'),
-    q('select * from expenses order by sort, created_at'),
+    ...STATE_TABLES.map((t) => q(`select * from ${t} order by ${t === 'invitations' ? '' : 'sort, '}created_at`)),
   ]);
-  return {
-    settings: settings[0]?.data || {},
-    members: members.map(publicMember),
-    invitations: invitations.map(clean),
-    guests: guests.map(clean),
-    tables: tables.map(clean),
-    expenses: expenses.map(clean),
-  };
+  const out = { settings: settings[0]?.data || {}, members: members.map(publicMember) };
+  STATE_TABLES.forEach((t, i) => (out[t] = lists[i].map((r) => clean(r, t))));
+  return out;
 }
 
 async function eventInfo() {
