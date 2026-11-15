@@ -1,0 +1,32 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Cormorant Garamond", ui-serif, Georgia, serif;
+  --color-olive-50: #f4f6ef;
+  --color-olive-100: #e6ebdb;
+  --color-olive-200: #cdd8b9;
+  --color-olive-300: #adbf8f;
+  --color-olive-400: #8da36a;
+  --color-olive-500: #6f874d;
+  --color-olive-600: #566b3a;
+  --color-olive-700: #445430;
+  --color-olive-800: #38442a;
+  --color-olive-900: #2f3a25;
+  --color-clay-50: #fbf4ef;
+  --color-clay-100: #f6e5d9;
+  --color-clay-200: #ecc8b1;
+  --color-clay-300: #e0a684;
+  --color-clay-400: #d2835a;
+  --color-clay-500: #c2693f;
+  --color-clay-600: #a85432;
+  --color-clay-700: #8a422b;
+  --color-cream: #faf7f1;
+}
+
+html, body, #root { height: 100%; }
+body { font-family: var(--font-sans); color: #292524; background: var(--color-cream); -webkit-font-smoothing: antialiased; }
+input[type="number"]::-webkit-inner-spin-button { opacity: .4; }
+button, a, select, summary { cursor: pointer; }
+button:disabled { cursor: not-allowed; }
+@media print { .no-print { display: none !important; } }
