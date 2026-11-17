@@ -231,3 +231,7 @@ create table if not exists rooms (
   created_at timestamptz not null default now()
 );
 alter table guests add column if not exists room_id uuid references rooms(id) on delete set null;
+
+-- ---------- v3: drepturi de editare ----------
+-- can_edit = false: contul vede tot, dar nu poate modifica nimic.
+alter table members add column if not exists can_edit boolean not null default true;

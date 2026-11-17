@@ -3,7 +3,7 @@ import { useStore } from '../lib/store.jsx';
 import { uid } from '../lib/api.js';
 import { EXPENSE_KINDS, EXPENSE_STATUS, budget, calcOf, eventOf, expenseTotal, headcount, money, scenario, withPayments } from '../lib/calc.js';
 import Payments from '../components/Payments.jsx';
-import { Button, Card, Cell, Empty, Field, PageHeader, Select, Stat, cx } from '../components/ui.jsx';
+import { Button, Card, Cell, Editable, Empty, Field, PageHeader, Select, Stat, cx } from '../components/ui.jsx';
 
 const CATEGORIES = ['Locație și meniu', 'Băuturi', 'Muzică', 'Foto și video', 'Decor și flori', 'Ținute', 'Papetărie', 'Cazare', 'Ceremonie', 'Altele'];
 
@@ -41,7 +41,7 @@ function NumberField({ label, value, onChange, suffix, hint }) {
 }
 
 export default function Budget() {
-  const { expenses: rawExpenses, payments, vendors, invitations, guests, tables, settings, mutate, saveSettings } = useStore();
+  const { expenses: rawExpenses, payments, vendors, invitations, guests, tables, settings, mutate, saveSettings, canEdit } = useStore();
   const expenses = useMemo(() => withPayments(rawExpenses, payments), [rawExpenses, payments]);
   const [open, setOpen] = useState(null);
   const ev = eventOf(settings);
@@ -90,13 +90,19 @@ export default function Budget() {
   return (
     <div>
       <PageHeader title="Buget" subtitle="Costuri, prag de rentabilitate și cât ar trebui să fie darul ca să ieși pe zero sau pe plus.">
-        {!expenses.length && (
+        {canEdit && !expenses.length && (
           <Button variant="secondary" onClick={addTemplate}>
             Adaugă cheltuielile tipice
           </Button>
         )}
-        <Button onClick={() => add()}>+ Cheltuială</Button>
+        {canEdit && <Button onClick={() => add()}>+ Cheltuială</Button>}
       </PageHeader>
+
+      {!canEdit && (
+        <div className="mb-4 rounded-xl bg-stone-100 px-4 py-2.5 text-sm text-stone-600">
+          Poți încerca alte scenarii la numărul de invitați și la darul mediu. Ce schimbi aici vezi doar tu și nu se salvează.
+        </div>
+      )}
 
       {/* scenariul de prezenta */}
       <Card className="mb-4">
@@ -244,9 +250,10 @@ export default function Budget() {
       {/* lista de cheltuieli */}
       {!expenses.length ? (
         <Empty title="Nicio cheltuială încă">
-          Pornește de la lista tipică (meniu, băuturi, DJ, foto, flori) și completează sumele din ofertele primite, sau adaugă-le una câte una.
+          {canEdit ? 'Pornește de la lista tipică (meniu, băuturi, DJ, foto, flori) și completează sumele din ofertele primite, sau adaugă-le una câte una.' : 'Costurile apar aici când mirii le adaugă.'}
         </Empty>
       ) : (
+        <Editable canEdit={canEdit}>
         <Card className="overflow-hidden p-0">
           <div className="overflow-x-auto">
             <table className="w-full min-w-[820px] text-sm">
@@ -286,9 +293,9 @@ export default function Budget() {
                           <tr className="border-t border-stone-100">
                             <td className="px-1 py-0.5">
                               <div className="flex items-center">
-                                <button className={cx('w-5 shrink-0 text-xs', open === e.id ? 'text-olive-700' : 'text-stone-400 hover:text-stone-700')} onClick={() => setOpen(open === e.id ? null : e.id)} title="Furnizor, stare și plăți">
+                                <span role="button" tabIndex={0} className={cx('w-5 shrink-0 cursor-pointer text-xs', open === e.id ? 'text-olive-700' : 'text-stone-400 hover:text-stone-700')} onClick={() => setOpen(open === e.id ? null : e.id)} title="Furnizor, stare și plăți">
                                   {open === e.id ? '▾' : '▸'}
-                                </button>
+                                </span>
                                 <Cell value={e.name} placeholder="Denumire" onCommit={(v) => save(e.id, { name: v })} />
                                 {e.status && e.status !== 'estimat' && <span className="ml-1 shrink-0 rounded-full bg-olive-100 px-1.5 py-0.5 text-[10px] font-medium text-olive-800">{EXPENSE_STATUS[e.status]}</span>}
                               </div>
@@ -397,6 +404,7 @@ export default function Budget() {
             </table>
           </div>
         </Card>
+        </Editable>
       )}
     </div>
   );

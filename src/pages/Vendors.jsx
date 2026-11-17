@@ -2,14 +2,14 @@ import React, { useMemo } from 'react';
 import { useStore } from '../lib/store.jsx';
 import { uid } from '../lib/api.js';
 import { VENDOR_STATUS, calcOf, eventOf, expenseTotal, headcount, money, scenario, withPayments } from '../lib/calc.js';
-import { Badge, Button, Card, Cell, Empty, PageHeader, Select, Stat } from '../components/ui.jsx';
+import { Badge, Button, Card, Cell, Editable, Empty, PageHeader, Select, Stat } from '../components/ui.jsx';
 import Payments from '../components/Payments.jsx';
 
 const CATEGORIES = ['Locație', 'DJ', 'Fotograf', 'Videograf', 'Florist și decor', 'Tort și candy bar', 'Rochie', 'Costum', 'Verighete', 'Machiaj și coafură', 'Biserică', 'Transport', 'Altele'];
 const TONE = { cautam: 'amber', oferta: 'clay', rezervat: 'green', contract: 'green', gata: 'stone' };
 
 export default function Vendors() {
-  const { vendors, expenses: raw, payments, invitations, guests, tables, settings, mutate } = useStore();
+  const { vendors, expenses: raw, payments, invitations, guests, tables, settings, mutate, canEdit } = useStore();
   const cur = eventOf(settings).currency || 'EUR';
   const expenses = useMemo(() => withPayments(raw, payments), [raw, payments]);
   const s = useMemo(
@@ -27,7 +27,7 @@ export default function Vendors() {
   return (
     <div>
       <PageHeader title="Furnizori" subtitle="Contacte, contracte și plăți. Cheltuielile legate aici sunt aceleași din Buget.">
-        <Button onClick={add}>+ Furnizor</Button>
+        {canEdit && <Button onClick={add}>+ Furnizor</Button>}
       </PageHeader>
       <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Stat label="Furnizori" value={vendors.length} sub={`${vendors.filter((v) => ['rezervat', 'contract', 'gata'].includes(v.status)).length} rezervați`} />
@@ -46,6 +46,7 @@ export default function Vendors() {
             const vPaid = mine.reduce((sum, e) => sum + (Number(e.paid) || 0), 0);
             return (
               <Card key={v.id} className="p-4">
+                <Editable canEdit={canEdit}>
                 <div className="flex flex-wrap items-center gap-2">
                   <Cell className="!w-auto min-w-0 flex-1 !text-base font-semibold" value={v.name} placeholder="Numele furnizorului" onCommit={(x) => save(v.id, { name: x })} />
                   <Badge tone={TONE[v.status]}>{VENDOR_STATUS[v.status] || v.status}</Badge>
@@ -115,7 +116,7 @@ export default function Vendors() {
                       <Payments expense={e} currency={cur} total={expenseTotal(e, s)} />
                     </div>
                   ))}
-                  {free.length > 0 && (
+                  {canEdit && free.length > 0 && (
                     <Select className="!py-1.5 !text-xs" value="" onChange={(e) => e.target.value && mutate({ op: 'save', table: 'expenses', row: { id: e.target.value, vendor_id: v.id } })}>
                       <option value="">+ Leagă o cheltuială din buget</option>
                       {free.map((e) => (
@@ -126,6 +127,7 @@ export default function Vendors() {
                     </Select>
                   )}
                 </div>
+                </Editable>
               </Card>
             );
           })}

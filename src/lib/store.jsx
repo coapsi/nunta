@@ -43,7 +43,7 @@ function mergeServer(state, saved) {
   return next;
 }
 
-export function StoreProvider({ children, onUnauthorized }) {
+export function StoreProvider({ children, onUnauthorized, canEdit = true }) {
   const [state, setState] = useState(EMPTY);
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState(null);
@@ -60,9 +60,13 @@ export function StoreProvider({ children, onUnauthorized }) {
     return () => clearTimeout(t);
   }, [toast]);
 
+  // Conturile doar de vizualizare pot incerca scenarii in buget, dar nu se salveaza nimic.
+  const localSettings = useRef(null);
+
   const reload = useCallback(async () => {
     try {
       const data = await rpc('state.load');
+      if (localSettings.current) data.settings = localSettings.current;
       if (pending.current === 0) setState(data);
     } catch (e) {
       if (e.status === 401) onUnauthorized?.();
@@ -89,6 +93,10 @@ export function StoreProvider({ children, onUnauthorized }) {
     (ops) => {
       const list = (Array.isArray(ops) ? ops : [ops]).filter(Boolean);
       if (!list.length) return Promise.resolve();
+      if (!canEdit) {
+        notify('Ai acces doar de vizualizare.', 'error');
+        return Promise.resolve();
+      }
       setState((s) => applyOps(s, list));
       pending.current += 1;
       const run = queue.current.then(async () => {
@@ -107,13 +115,17 @@ export function StoreProvider({ children, onUnauthorized }) {
       queue.current = run;
       return run;
     },
-    [notify, reload, onUnauthorized],
+    [notify, reload, onUnauthorized, canEdit],
   );
 
   const settingsTimer = useRef(null);
   const saveSettings = useCallback(
     (data) => {
       setState((s) => ({ ...s, settings: data }));
+      if (!canEdit) {
+        localSettings.current = data;
+        return;
+      }
       if (!settingsTimer.current) pending.current += 1;
       clearTimeout(settingsTimer.current);
       settingsTimer.current = setTimeout(async () => {
@@ -126,13 +138,13 @@ export function StoreProvider({ children, onUnauthorized }) {
         pending.current = Math.max(0, pending.current - 1);
       }, 500);
     },
-    [notify],
+    [notify, canEdit],
   );
 
   const setMembers = useCallback((fn) => setState((s) => ({ ...s, members: fn(s.members) })), []);
 
   return (
-    <Ctx.Provider value={{ ...state, loading, reload, mutate, saveSettings, setMembers, notify }}>
+    <Ctx.Provider value={{ ...state, loading, reload, mutate, saveSettings, setMembers, notify, canEdit }}>
       {children}
       {toast && (
         <div

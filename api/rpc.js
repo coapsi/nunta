@@ -74,6 +74,7 @@ function publicMember(m) {
     name: m.name,
     role_label: m.role_label,
     email: m.email,
+    can_edit: m.can_edit !== false,
     active: !!m.password_hash,
     invite_code: m.password_hash ? null : m.invite_code,
     last_login: m.last_login,
@@ -186,6 +187,8 @@ const PUBLIC = {
 };
 
 // ---------- actiuni pentru conturile nuntii ----------
+const READ_ONLY_ACTIONS = new Set(['state.load']);
+
 const PRIVATE = {
   'state.load': () => loadState(),
 
@@ -207,15 +210,15 @@ const PRIVATE = {
     return { settings: data };
   },
 
-  async 'member.create'({ name, role_label, email }) {
+  async 'member.create'({ name, role_label, email, can_edit }) {
     const mail = String(email || '').trim().toLowerCase() || null;
     if (mail) {
       const taken = await q('select 1 from members where lower(email) = $1', [mail]);
       if (taken.length) throw new ApiError('email_taken');
     }
     const rows = await q(
-      'insert into members (name, role_label, email, invite_code) values ($1, $2, $3, $4) returning *',
-      [String(name || '').trim(), String(role_label || '').trim(), mail, newCode()],
+      'insert into members (name, role_label, email, invite_code, can_edit) values ($1, $2, $3, $4, $5) returning *',
+      [String(name || '').trim(), String(role_label || '').trim(), mail, newCode(), can_edit !== false],
     );
     return { member: publicMember(rows[0]) };
   },
@@ -225,6 +228,13 @@ const PRIVATE = {
       'update members set password_hash = null, invite_code = $2 where id = $1 returning *',
       [id, newCode()],
     );
+    if (!rows.length) throw new ApiError('not_found', 404);
+    return { member: publicMember(rows[0]) };
+  },
+
+  async 'member.setAccess'({ id, can_edit }, { memberId }) {
+    if (id === memberId) throw new ApiError('cannot_change_self');
+    const rows = await q('update members set can_edit = $2 where id = $1 returning *', [id, !!can_edit]);
     if (!rows.length) throw new ApiError('not_found', 404);
     return { member: publicMember(rows[0]) };
   },
@@ -254,8 +264,10 @@ export default async function handler(req, res) {
 
     if (PRIVATE[action]) {
       const memberId = readSession(req);
-      const ok = memberId && (await q('select 1 from members where id = $1 and password_hash is not null', [memberId])).length;
-      if (!ok) throw new ApiError('unauthorized', 401);
+      const me = memberId && (await q('select can_edit from members where id = $1 and password_hash is not null', [memberId]))[0];
+      if (!me) throw new ApiError('unauthorized', 401);
+      // Conturile fara drept de editare pot doar citi.
+      if (!READ_ONLY_ACTIONS.has(action) && me.can_edit === false) throw new ApiError('read_only', 403);
       return res.status(200).json(await PRIVATE[action](payload, { ...ctx, memberId }));
     }
     throw new ApiError('unknown_action', 404);

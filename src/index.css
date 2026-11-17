@@ -30,3 +30,13 @@ input[type="number"]::-webkit-inner-spin-button { opacity: .4; }
 button, a, select, summary { cursor: pointer; }
 button:disabled { cursor: not-allowed; }
 @media print { .no-print { display: none !important; } }
+
+/* Conturi doar de vizualizare: zonele editabile devin text simplu, fara butoane de modificare. */
+fieldset:disabled button { display: none !important; }
+fieldset:disabled input,
+fieldset:disabled textarea,
+fieldset:disabled select { cursor: default; opacity: 1; color: inherit; -webkit-text-fill-color: currentColor; }
+fieldset:disabled select { appearance: none; background-image: none; }
+fieldset:disabled input[type="date"]::-webkit-calendar-picker-indicator { display: none; }
+fieldset:disabled input::placeholder,
+fieldset:disabled textarea::placeholder { color: transparent; -webkit-text-fill-color: transparent; }

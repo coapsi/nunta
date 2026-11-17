@@ -52,7 +52,10 @@ function Shell({ member, onLogout }) {
             ))}
           </nav>
           <div className="hidden text-right text-xs text-stone-500 sm:block">
-            <div className="font-medium text-stone-700">{member.name}</div>
+            <div className="font-medium text-stone-700">
+              {member.name}
+              {member.can_edit === false && <span className="ml-1.5 rounded-full bg-stone-200 px-1.5 py-0.5 text-[10px] font-medium text-stone-600">vizualizare</span>}
+            </div>
             <button onClick={onLogout} className="hover:text-stone-800 hover:underline">
               Ieși din cont
             </button>
@@ -104,7 +107,7 @@ function AdminApp() {
   if (member === undefined) return <div className="py-24 text-center text-sm text-stone-500">Se încarcă...</div>;
   if (!member) return <Login onLogin={setMember} />;
   return (
-    <StoreProvider onUnauthorized={onUnauthorized}>
+    <StoreProvider onUnauthorized={onUnauthorized} canEdit={member.can_edit !== false}>
       <Shell member={member} onLogout={logout} />
     </StoreProvider>
   );

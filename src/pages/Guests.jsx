@@ -244,7 +244,7 @@ function BulkModal({ onClose }) {
 }
 
 export default function Guests() {
-  const { invitations, guests, tables, settings, mutate, notify } = useStore();
+  const { invitations, guests, tables, settings, mutate, notify, canEdit } = useStore();
   const [editing, setEditing] = useState(null); // 'new' | invitation
   const [bulk, setBulk] = useState(false);
   const [search, setSearch] = useState('');
@@ -352,10 +352,14 @@ export default function Guests() {
         <Button variant="secondary" onClick={exportCsv} disabled={!invitations.length}>
           Export CSV
         </Button>
-        <Button variant="secondary" onClick={() => setBulk(true)}>
-          Adaugă mai mulți
-        </Button>
-        <Button onClick={() => setEditing('new')}>+ Invitație</Button>
+        {canEdit && (
+          <>
+            <Button variant="secondary" onClick={() => setBulk(true)}>
+              Adaugă mai mulți
+            </Button>
+            <Button onClick={() => setEditing('new')}>+ Invitație</Button>
+          </>
+        )}
       </PageHeader>
 
       <div className="mb-5 grid grid-cols-2 gap-3 md:grid-cols-5">
@@ -399,7 +403,7 @@ export default function Guests() {
       </Card>
 
       {!invitations.length ? (
-        <Empty title="Încă nu ai niciun invitat">Adaugă prima invitație sau lipește toată lista dintr-o dată cu „Adaugă mai mulți”.</Empty>
+        <Empty title="Încă nu e niciun invitat">{canEdit ? 'Adaugă prima invitație sau lipește toată lista dintr-o dată cu „Adaugă mai mulți”.' : 'Lista apare aici când mirii adaugă invitații.'}</Empty>
       ) : (
         <div className="space-y-2">
           {filtered.map((inv) => {
@@ -442,26 +446,34 @@ export default function Guests() {
                     {inv.notes && <div className="mt-1 text-xs italic text-stone-500">{inv.notes}</div>}
                   </div>
                   <div className="flex flex-wrap items-center gap-1.5">
+                    {canEdit && (
                     <Select className="!w-auto !py-1.5 !text-xs" value={inv.status} onChange={(e) => setInvStatus(inv, e.target.value)} title="Schimbă răspunsul manual">
                       <option value="pending">Fără răspuns</option>
                       <option value="yes">Vine</option>
                       <option value="no">Nu vine</option>
                     </Select>
+                    )}
                     <Button size="sm" variant="secondary" onClick={() => copyLink(inv)}>
                       Copiază link
                     </Button>
-                    <Button size="sm" variant="secondary" onClick={() => whatsapp(inv)}>
-                      WhatsApp
-                    </Button>
+                    {canEdit && (
+                      <Button size="sm" variant="secondary" onClick={() => whatsapp(inv)}>
+                        WhatsApp
+                      </Button>
+                    )}
                     <a className="rounded-lg px-2 py-1.5 text-xs font-medium text-olive-700 hover:bg-olive-50" href={`/i/${inv.token}`} target="_blank" rel="noreferrer">
                       Vezi
                     </a>
-                    <Button size="sm" variant="ghost" onClick={() => setEditing(inv)}>
-                      Editează
-                    </Button>
-                    <Button size="sm" variant="ghost" className="!text-red-600" onClick={() => remove(inv)}>
-                      Șterge
-                    </Button>
+                    {canEdit && (
+                      <>
+                        <Button size="sm" variant="ghost" onClick={() => setEditing(inv)}>
+                          Editează
+                        </Button>
+                        <Button size="sm" variant="ghost" className="!text-red-600" onClick={() => remove(inv)}>
+                          Șterge
+                        </Button>
+                      </>
+                    )}
                   </div>
                 </div>
               </Card>

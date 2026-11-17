@@ -3,7 +3,7 @@ import { useStore } from '../lib/store.jsx';
 import { uid } from '../lib/api.js';
 import { PHASES, eventOf, fmtDate, money, taskDue, todayIso } from '../lib/calc.js';
 import { ITEMS, LISTS, SCHEDULE, TASKS } from '../lib/seeds.js';
-import { Button, Card, Cell, Empty, PageHeader, Select, cx } from '../components/ui.jsx';
+import { Button, Card, Cell, Editable, Empty, PageHeader, Select, cx } from '../components/ui.jsx';
 
 const TABS = [
   { key: 'tasks', label: 'Checklist' },
@@ -12,7 +12,7 @@ const TABS = [
 ];
 
 function Checklist() {
-  const { tasks, members, settings, mutate } = useStore();
+  const { tasks, members, settings, mutate, canEdit } = useStore();
   const [filter, setFilter] = useState('open');
   const date = eventOf(settings).date;
   const today = todayIso();
@@ -25,9 +25,11 @@ function Checklist() {
     return (
       <Empty title="Checklistul e gol">
         Pornește de la lista recomandată: tot ce e de făcut, din momentul în care alegi locația până după nuntă.
-        <div className="mt-4">
-          <Button onClick={seed}>Adaugă lista recomandată</Button>
-        </div>
+        {canEdit && (
+          <div className="mt-4">
+            <Button onClick={seed}>Adaugă lista recomandată</Button>
+          </div>
+        )}
       </Empty>
     );
 
@@ -55,7 +57,7 @@ function Checklist() {
         {!date && <p className="mt-2 text-xs text-clay-600">Pune data nunții în Setări și fiecare sarcină primește automat un termen.</p>}
       </Card>
 
-      <div className="space-y-4">
+      <Editable canEdit={canEdit} className="space-y-4">
         {PHASES.map((ph) => {
           const all = tasks.filter((t) => Number(t.months_before) === ph.key);
           const list = all.filter((t) => (filter === 'all' ? true : filter === 'done' ? t.done : !t.done));
@@ -100,7 +102,7 @@ function Checklist() {
             </Card>
           );
         })}
-      </div>
+      </Editable>
     </div>
   );
 }
@@ -114,7 +116,7 @@ const timeKey = (t) => {
 };
 
 function DaySchedule() {
-  const { schedule, vendors, settings, mutate } = useStore();
+  const { schedule, vendors, settings, mutate, canEdit } = useStore();
   const ev = eventOf(settings);
   const list = useMemo(() => [...schedule].sort((a, b) => timeKey(a.time) - timeKey(b.time) || a.sort - b.sort), [schedule]);
   const save = (id, patch) => mutate({ op: 'save', table: 'schedule', row: { id, ...patch } });
@@ -128,9 +130,11 @@ function DaySchedule() {
         {!schedule.length ? (
           <Empty title="Programul zilei e gol">
             Pornește de la un program tipic și potrivește orele. Îl poți trimite apoi furnizorilor și nașilor.
-            <div className="mt-4">
-              <Button onClick={seed}>Adaugă un program tipic</Button>
-            </div>
+            {canEdit && (
+              <div className="mt-4">
+                <Button onClick={seed}>Adaugă un program tipic</Button>
+              </div>
+            )}
           </Empty>
         ) : (
           <Card className="p-0">
@@ -140,11 +144,14 @@ function DaySchedule() {
                 <button className="no-print text-xs font-medium text-stone-500 hover:underline" onClick={() => window.print()}>
                   Printează
                 </button>
-                <button className="no-print text-xs font-medium text-olive-700 hover:underline" onClick={add}>
-                  + moment
-                </button>
+                {canEdit && (
+                  <button className="no-print text-xs font-medium text-olive-700 hover:underline" onClick={add}>
+                    + moment
+                  </button>
+                )}
               </div>
             </div>
+            <Editable canEdit={canEdit}>
             {list.map((r) => (
               <div key={r.id} className="flex flex-wrap items-center gap-x-1 border-b border-stone-50 px-3 py-1 last:border-0">
                 <Cell className="!w-16 font-semibold tabular-nums text-olive-800" value={r.time} placeholder="00:00" onCommit={(v) => save(r.id, { time: v })} />
@@ -156,6 +163,7 @@ function DaySchedule() {
                 </button>
               </div>
             ))}
+            </Editable>
           </Card>
         )}
         <p className="mt-2 text-xs text-stone-500">Momentele se ordonează singure după oră. Orele din programul tipic sunt orientative.</p>
@@ -191,7 +199,7 @@ function DaySchedule() {
 }
 
 function ItemList({ list }) {
-  const { items, settings, mutate } = useStore();
+  const { items, settings, mutate, canEdit } = useStore();
   const def = LISTS[list];
   const cur = eventOf(settings).currency || 'EUR';
   const mine = items.filter((i) => i.list === list);
@@ -209,14 +217,14 @@ function ItemList({ list }) {
         <p className="text-sm text-stone-500">{def.hint}</p>
         <div className="flex items-center gap-3 text-xs text-stone-500">
           {def.price && <span>Total: {money(total, cur)}</span>}
-          {!mine.length && seedRows.length > 0 && (
+          {canEdit && !mine.length && seedRows.length > 0 && (
             <Button size="sm" variant="secondary" onClick={seed}>
               Adaugă lista recomandată
             </Button>
           )}
         </div>
       </div>
-      <div className="space-y-4">
+      <Editable canEdit={canEdit} className="space-y-4">
         {groups.map((grp) => {
           const rows = mine.filter((i) => (i.grp || '') === grp);
           return (
@@ -252,7 +260,7 @@ function ItemList({ list }) {
             </Card>
           );
         })}
-      </div>
+      </Editable>
     </div>
   );
 }

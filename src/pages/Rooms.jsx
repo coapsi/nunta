@@ -2,10 +2,10 @@ import React, { useMemo } from 'react';
 import { useStore } from '../lib/store.jsx';
 import { uid } from '../lib/api.js';
 import { eventOf, money } from '../lib/calc.js';
-import { Button, Card, Cell, Empty, PageHeader, Select, Stat } from '../components/ui.jsx';
+import { Button, Card, Cell, Editable, Empty, PageHeader, Select, Stat } from '../components/ui.jsx';
 
 export default function Rooms() {
-  const { rooms, guests, invitations, settings, mutate } = useStore();
+  const { rooms, guests, invitations, settings, mutate, canEdit } = useStore();
   const cur = eventOf(settings).currency || 'EUR';
   const invById = useMemo(() => Object.fromEntries(invitations.map((i) => [i.id, i])), [invitations]);
   const people = useMemo(() => guests.filter((g) => g.attending !== false && invById[g.invitation_id]?.status !== 'no'), [guests, invById]);
@@ -19,7 +19,7 @@ export default function Rooms() {
   return (
     <div>
       <PageHeader title="Cazare" subtitle="Camerele rezervate și cine doarme în fiecare.">
-        <Button onClick={add}>+ Cameră</Button>
+        {canEdit && <Button onClick={add}>+ Cameră</Button>}
       </PageHeader>
       <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Stat label="Camere" value={rooms.length} />
@@ -36,6 +36,7 @@ export default function Rooms() {
             const full = inside.length >= (Number(r.capacity) || 0);
             return (
               <Card key={r.id} className="p-4">
+                <Editable canEdit={canEdit}>
                 <div className="flex items-center gap-1">
                   <Cell className="min-w-0 flex-1 font-semibold" value={r.name} placeholder="Numele camerei" onCommit={(v) => save(r.id, { name: v })} />
                   <button className="text-stone-300 hover:text-red-600" onClick={() => window.confirm(`Ștergi „${r.name}”?`) && mutate({ op: 'delete', table: 'rooms', id: r.id })}>
@@ -59,7 +60,7 @@ export default function Rooms() {
                     </div>
                   ))}
                 </div>
-                {!full && (
+                {canEdit && !full && (
                   <Select className="mt-2 !py-1.5 !text-xs" value="" onChange={(e) => e.target.value && mutate({ op: 'save', table: 'guests', row: { id: e.target.value, room_id: r.id } })}>
                     <option value="">+ Adaugă un invitat ({inside.length}/{r.capacity})</option>
                     {free.map((g) => (
@@ -70,6 +71,7 @@ export default function Rooms() {
                     ))}
                   </Select>
                 )}
+                </Editable>
               </Card>
             );
           })}

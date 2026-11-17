@@ -2,7 +2,7 @@ import React, { useMemo, useRef, useState } from 'react';
 import { useStore } from '../lib/store.jsx';
 import { uid } from '../lib/api.js';
 import { SHAPES, SEAT_R, layout, initials } from '../lib/tables.js';
-import { Badge, Button, Card, Field, Input, Modal, PageHeader, Select } from '../components/ui.jsx';
+import { Badge, Button, Card, Editable, Field, Input, Modal, PageHeader, Select } from '../components/ui.jsx';
 import { SIDES } from './Guests.jsx';
 
 const CANVAS = { w: 2600, h: 1700 };
@@ -26,7 +26,7 @@ function TableShape({ t, lay, selected }) {
 }
 
 export default function Seating() {
-  const { tables, guests, invitations, mutate } = useStore();
+  const { tables, guests, invitations, mutate, canEdit } = useStore();
   const [selectedId, setSelectedId] = useState(null);
   const [picked, setPicked] = useState(null); // invitatul ales din lista, urmeaza sa fie asezat
   const [zoom, setZoom] = useState(0.8);
@@ -142,7 +142,7 @@ export default function Seating() {
   function onTableDown(e, t) {
     e.stopPropagation();
     setSelectedId(t.id);
-    if (picked) return;
+    if (picked || !canEdit) return;
     const p = toCanvas(e);
     dragRef.current = { id: t.id, dx: p.x - t.x, dy: p.y - t.y, moved: false };
     e.currentTarget.setPointerCapture?.(e.pointerId);
@@ -166,6 +166,7 @@ export default function Seating() {
   function onSeatClick(e, t, seat) {
     e.stopPropagation();
     setSelectedId(t.id);
+    if (!canEdit) return;
     if (picked) return assign(picked, t.id, seat);
     if (!seatMap.has(`${t.id}:${seat}`)) setSeatPick({ tableId: t.id, seat });
   }
@@ -178,14 +179,16 @@ export default function Seating() {
         <Button variant="secondary" onClick={() => setListOpen(true)} disabled={!tables.length}>
           Lista pe mese
         </Button>
-        <Select className="!w-auto" value="" onChange={(e) => e.target.value && addTable(e.target.value)}>
-          <option value="">+ Adaugă masă</option>
-          {Object.entries(SHAPES).map(([k, v]) => (
-            <option key={k} value={k}>
-              {v}
-            </option>
-          ))}
-        </Select>
+        {canEdit && (
+          <Select className="!w-auto" value="" onChange={(e) => e.target.value && addTable(e.target.value)}>
+            <option value="">+ Adaugă masă</option>
+            {Object.entries(SHAPES).map(([k, v]) => (
+              <option key={k} value={k}>
+                {v}
+              </option>
+            ))}
+          </Select>
+        )}
       </PageHeader>
 
       <div className="flex flex-col gap-4 lg:flex-row">
@@ -212,10 +215,10 @@ export default function Seating() {
               return (
                 <div
                   key={g.id}
-                  draggable
+                  draggable={canEdit}
                   onDragStart={(e) => e.dataTransfer.setData('text/guest', g.id)}
-                  onClick={() => setPicked(active ? null : g)}
-                  className={`mb-1 flex cursor-grab items-center gap-2 rounded-lg border px-2 py-1.5 text-sm ${
+                  onClick={() => canEdit && setPicked(active ? null : g)}
+                  className={`mb-1 flex ${canEdit ? 'cursor-grab' : ''} items-center gap-2 rounded-lg border px-2 py-1.5 text-sm ${
                     active ? 'border-olive-500 bg-olive-50' : 'border-transparent hover:bg-stone-50'
                   }`}
                 >
@@ -233,7 +236,9 @@ export default function Seating() {
             })}
           </div>
           <div className="mt-2 border-t border-stone-100 pt-2 text-[11px] leading-snug text-stone-500">
-            {picked ? (
+            {!canEdit ? (
+              'Treci cu mouse-ul peste un loc ca să vezi cine stă acolo.'
+            ) : picked ? (
               <span className="font-medium text-olive-700">Apasă pe un loc sau pe o masă pentru {picked.name}.</span>
             ) : (
               'Trage un nume pe un loc sau apasă pe el și apoi pe masă.'
@@ -367,6 +372,7 @@ export default function Seating() {
                 ✕
               </button>
             </div>
+            <Editable canEdit={canEdit}>
             <div className="space-y-3">
               <Field label="Nume">
                 <Input value={selected.name} onChange={(e) => updateTable({ name: e.target.value })} />
@@ -449,6 +455,7 @@ export default function Seating() {
             <Button variant="danger" size="sm" className="mt-4 w-full" onClick={removeTable}>
               Șterge {selected.shape === 'zone' ? 'zona' : 'masa'}
             </Button>
+            </Editable>
           </Card>
         )}
       </div>

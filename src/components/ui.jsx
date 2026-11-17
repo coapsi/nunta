@@ -170,3 +170,12 @@ export function Cell({ value, onCommit, type = 'text', className, ...props }) {
 
 
 export { cx };
+
+// Tot ce e in interior devine needitabil (campuri, liste, butoane) pentru conturile doar de vizualizare.
+export function Editable({ canEdit, className, children }) {
+  return (
+    <fieldset disabled={!canEdit} className={cx('m-0 min-w-0 border-0 p-0', className)}>
+      {children}
+    </fieldset>
+  );
+}

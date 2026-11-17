@@ -8,6 +8,8 @@ const MESSAGES = {
   not_found: 'Nu am găsit ce căutai.',
   closed: 'Perioada de confirmare s-a încheiat. Te rugăm să ne contactezi direct.',
   cannot_delete_self: 'Nu îți poți șterge propriul cont.',
+  cannot_change_self: 'Nu îți poți schimba propriile drepturi.',
+  read_only: 'Ai acces doar de vizualizare.',
   server: 'A apărut o eroare. Încearcă din nou.',
 };
 
